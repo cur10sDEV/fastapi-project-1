@@ -1,9 +1,8 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import HTTPException, status, APIRouter, Depends
-from fastapi.params import Body, Path
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException, status, APIRouter, Depends, Body, Path
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.books.schemas import BookSchema, BookCreateSchema, BookUpdateSchema
 from src.books.services import BookService

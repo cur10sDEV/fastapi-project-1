@@ -4,7 +4,7 @@ from sqlmodel import select, insert, update, delete, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from .models import Book
-from .schemas import BookCreateSchema
+from .schemas import BookCreateSchema, BookUpdateSchema
 
 
 class BookService:
@@ -38,7 +38,7 @@ class BookService:
         return result.one_or_none()
 
     async def update_book(
-        self, book_id: UUID, book_data: BookCreateSchema, session: AsyncSession
+        self, book_id: UUID, book_data: BookUpdateSchema, session: AsyncSession
     ):
         book_data_dict = book_data.model_dump()
 
