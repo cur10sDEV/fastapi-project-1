@@ -20,8 +20,7 @@ class Book(SQLModel, table=True):
         max_length=1000,
     )
 
-    # author_id: UUID = Field(foreign_key="authors.id")
-    author_id: UUID = Field(default_factory=uuid4)
+    author_id: UUID = Field(foreign_key="users.id")
 
     # publisher_id: UUID = Field(foreign_key="publishers.id")
     publisher_id: UUID = Field(default_factory=uuid4)

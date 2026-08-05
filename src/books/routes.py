@@ -1,19 +1,21 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import HTTPException, status, APIRouter, Depends, Body, Path
+from fastapi import HTTPException, status, APIRouter, Body, Path, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.books.schemas import BookSchema, BookCreateSchema, BookUpdateSchema
-from src.books.services import BookService
+from src.auth.dependencies import AccessTokenBearer
 from src.db.main import get_session
+from .schemas import BookSchema, BookCreateSchema, BookUpdateSchema
+from .services import BookService
 
 book_router = APIRouter(tags=["Books"])
 book_service = BookService()
+access_token_bearer = AccessTokenBearer()
 
 
 @book_router.get("/", response_model=list[BookSchema], status_code=status.HTTP_200_OK)
-async def get_books(session: AsyncSession = Depends(get_session)):
+async def get_books(session: Annotated[AsyncSession, Depends(get_session)]):
     books = await book_service.get_all_books(session)
 
     return books
@@ -23,7 +25,8 @@ async def get_books(session: AsyncSession = Depends(get_session)):
     "/{book_id}", response_model=BookSchema, status_code=status.HTTP_200_OK
 )
 async def get_book(
-    book_id: Annotated[UUID, Path()], session: AsyncSession = Depends(get_session)
+    book_id: Annotated[UUID, Path()],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ):
     book = await book_service.get_book_by_id(book_id, session)
 
@@ -38,9 +41,13 @@ async def get_book(
 @book_router.post("/", response_model=BookSchema, status_code=status.HTTP_201_CREATED)
 async def add_book(
     book_data: Annotated[BookCreateSchema, Body()],
-    session: AsyncSession = Depends(get_session),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[dict, Depends(access_token_bearer)],
 ):
-    book = await book_service.create_book(book_data, session)
+    book_data_dict = book_data.model_dump()
+    book_data_dict["author_id"] = auth["sub"]
+
+    book = await book_service.create_book(book_data_dict, session)
 
     if book is None:
         raise HTTPException(
@@ -56,8 +63,12 @@ async def add_book(
 async def update_book_by_id(
     book_id: Annotated[UUID, Path()],
     book_data: Annotated[BookUpdateSchema, Body()],
-    session: AsyncSession = Depends(get_session),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[dict, Depends(access_token_bearer)],
 ):
+    book_data_dict = book_data.model_dump()
+    book_data_dict["author_id"] = auth["sub"]
+
     book = await book_service.get_book_by_id(book_id, session)
 
     if book is None:
@@ -65,7 +76,7 @@ async def update_book_by_id(
             status_code=status.HTTP_404_NOT_FOUND, detail="book not found"
         )
 
-    updated_book = await book_service.update_book(book_id, book_data, session)
+    updated_book = await book_service.update_book(book_id, book_data_dict, session)
 
     if updated_book is None:
         raise HTTPException(
@@ -79,7 +90,9 @@ async def update_book_by_id(
     "/{book_id}", response_model=BookSchema, status_code=status.HTTP_200_OK
 )
 async def delete_book_by_id(
-    book_id: Annotated[UUID, Path()], session: AsyncSession = Depends(get_session)
+    book_id: Annotated[UUID, Path()],
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[dict, Depends(access_token_bearer)],
 ):
     book = await book_service.get_book_by_id(book_id, session)
 

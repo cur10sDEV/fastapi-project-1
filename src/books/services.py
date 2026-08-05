@@ -4,7 +4,6 @@ from sqlmodel import select, insert, update, delete, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from .models import Book
-from .schemas import BookCreateSchema, BookUpdateSchema
 
 
 class BookService:
@@ -26,8 +25,7 @@ class BookService:
 
         return result.one_or_none()
 
-    async def create_book(self, book_data: BookCreateSchema, session: AsyncSession):
-        book_data_dict = book_data.model_dump()
+    async def create_book(self, book_data_dict: dict, session: AsyncSession):
 
         statement = insert(Book).values(book_data_dict).returning("*")
 
@@ -38,10 +36,8 @@ class BookService:
         return result.one_or_none()
 
     async def update_book(
-        self, book_id: UUID, book_data: BookUpdateSchema, session: AsyncSession
+        self, book_id: UUID, book_data_dict: dict, session: AsyncSession
     ):
-        book_data_dict = book_data.model_dump()
-
         statement = (
             update(Book).where(Book.id == book_id).values(book_data_dict).returning("*")
         )

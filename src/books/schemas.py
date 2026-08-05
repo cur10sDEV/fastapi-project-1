@@ -23,7 +23,6 @@ class BookCreateSchema(BaseModel):
         default=None,
         max_length=1000,
     )
-    author_id: str
     publisher_id: str
     published_date: date
     page_count: int = Field(gt=0)

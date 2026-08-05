@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from src.auth.routes import auth_router
 from src.books.routes import book_router
 from src.db.main import init_db
 
@@ -15,6 +16,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(root_path="/api/v1", description="A test api", lifespan=lifespan)
 
 app.include_router(book_router, prefix="/books")
+app.include_router(auth_router, prefix="/auth")
 
 
 @app.get("/health", status_code=200)

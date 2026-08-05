@@ -2,10 +2,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-import src.books.models  # noqa: F401 — registers tables with SQLModel.metadata
-from config import config
+from src.auth.models import User  # noqa: F401
+from src.books.models import Book  # noqa: F401
+from src.config import app_config
 
-async_engine = create_async_engine(url=config.database_url, echo=True)
+async_engine = create_async_engine(url=app_config.DATABASE_URL, echo=True)
 
 
 async def init_db():
