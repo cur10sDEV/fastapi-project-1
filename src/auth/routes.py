@@ -12,7 +12,7 @@ from src.db.redis import (
     delete_refresh_token_jti,
 )
 from src.utils.main import verify_password, create_jwt_token
-from .dependencies import RefreshTokenBearer, AccessTokenBearer
+from .dependencies import RefreshTokenBearer, AccessTokenBearer, get_current_user
 from .models import User
 from .schemas import UserCreateSchema, UserLoginSchema
 from .services import UserService
@@ -153,3 +153,8 @@ async def logout_user(auth: Annotated[dict, Depends(access_token_bearer)]):
         )
 
     return {}
+
+
+@auth_router.get("/me", response_model=User, status_code=status.HTTP_200_OK)
+async def get_current_user(user: Annotated[User, Depends(get_current_user)]):
+    return user

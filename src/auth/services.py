@@ -27,6 +27,15 @@ class UserService:
 
         return result.one_or_none()
 
+    async def get_user_by_id(self, user_id: str, session: AsyncSession):
+        statement = select(User).where(User.id == user_id)
+
+        result = await session.exec(statement)
+
+        await session.commit()
+
+        return result.one_or_none()
+
     async def user_exists(self, email: str, username: str, session: AsyncSession):
         existing_user = await self.get_user_by_email(email, session)
 
