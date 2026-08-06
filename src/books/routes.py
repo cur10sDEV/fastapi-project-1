@@ -67,7 +67,9 @@ async def update_book_by_id(
     auth: Annotated[dict, Depends(access_token_bearer)],
 ):
     book_data_dict = book_data.model_dump()
-    book_data_dict["author_id"] = auth["sub"]
+
+    if not book_data_dict["author_id"] == auth["sub"]:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not the author")
 
     book = await book_service.get_book_by_id(book_id, session)
 
@@ -101,9 +103,12 @@ async def delete_book_by_id(
             status_code=status.HTTP_404_NOT_FOUND, detail="book not found"
         )
 
+    if not book["author_id"] == auth["sub"]:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not the author")
+
     deleted_book = await book_service.delete_book_by_id(book_id, session)
 
-    if delete_book_by_id is None:
+    if deleted_book is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Failed to delete book"
         )

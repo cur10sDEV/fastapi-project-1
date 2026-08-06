@@ -10,6 +10,7 @@ dependencies = [
     "fastapi[standard]>=0.140.13",
     "pydantic-settings>=2.14.2",
     "pyjwt>=2.13.0",
+    "redis>=8.1.0",
     "sqlmodel>=0.0.39",
 ]
 

@@ -2,11 +2,15 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timezone, timedelta
-from uuid import uuid4
 
 import jwt
 from argon2 import PasswordHasher
-from argon2.exceptions import HashingError
+from argon2.exceptions import (
+    HashingError,
+    VerifyMismatchError,
+    VerificationError,
+    InvalidHashError,
+)
 
 from src.config import app_config
 
@@ -44,15 +48,12 @@ async def hash_password(input_password: str):
 async def verify_password(input_password: str, hashed_password: str):
     try:
         return await asyncio.to_thread(ph.verify, hashed_password, input_password)
-    except Exception as e:
+    except (VerifyMismatchError, VerificationError, InvalidHashError) as e:
         logging.exception(e)
         return False
 
 
-def create_jwt_token(
-    user_id: str,
-    refresh: bool = False,
-):
+def create_jwt_token(user_id: str, jti: str, refresh: bool = False):
 
     now = utcnow()
 
@@ -66,7 +67,7 @@ def create_jwt_token(
         "exp": expiry,
         "iat": now,
         "nbf": now,
-        "jti": str(uuid4()),
+        "jti": jti,
         "refresh": refresh,
         "aud": AUDIENCE,
         "iss": ISSUER,
