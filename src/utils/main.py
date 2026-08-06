@@ -53,7 +53,7 @@ async def verify_password(input_password: str, hashed_password: str):
         return False
 
 
-def create_jwt_token(user_id: str, jti: str, refresh: bool = False):
+def create_jwt_token(user_id: str, role: str, jti: str, refresh: bool = False):
 
     now = utcnow()
 
@@ -71,6 +71,7 @@ def create_jwt_token(user_id: str, jti: str, refresh: bool = False):
         "refresh": refresh,
         "aud": AUDIENCE,
         "iss": ISSUER,
+        "role": role,
     }
 
     try:

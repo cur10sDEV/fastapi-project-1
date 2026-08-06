@@ -4,12 +4,15 @@ from uuid import UUID
 from fastapi import HTTPException, status, APIRouter, Body, Path, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.auth.dependencies import AccessTokenBearer
+from src.auth.dependencies import AccessTokenBearer, RoleChecker
+from src.auth.models import UserRole
 from src.db.main import get_session
 from .schemas import BookSchema, BookCreateSchema, BookUpdateSchema
 from .services import BookService
 
-book_router = APIRouter(tags=["Books"])
+user_role_checker = Depends(RoleChecker([UserRole.USER]))
+
+book_router = APIRouter(tags=["Books"], dependencies=[user_role_checker])
 book_service = BookService()
 access_token_bearer = AccessTokenBearer()
 
@@ -68,15 +71,15 @@ async def update_book_by_id(
 ):
     book_data_dict = book_data.model_dump()
 
-    if not book_data_dict["author_id"] == auth["sub"]:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not the author")
-
     book = await book_service.get_book_by_id(book_id, session)
 
     if book is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="book not found"
         )
+
+    if not str(book.author_id) == auth["sub"]:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not the author")
 
     updated_book = await book_service.update_book(book_id, book_data_dict, session)
 
@@ -103,7 +106,7 @@ async def delete_book_by_id(
             status_code=status.HTTP_404_NOT_FOUND, detail="book not found"
         )
 
-    if not book["author_id"] == auth["sub"]:
+    if not str(book.author_id) == auth["sub"]:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not the author")
 
     deleted_book = await book_service.delete_book_by_id(book_id, session)

@@ -1,4 +1,4 @@
-from typing import Any, Annotated
+from typing import Any, Annotated, List
 
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer
@@ -6,6 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.db.main import get_session
 from src.utils.main import decode_token
+from .models import UserRole, User
 from .services import UserService
 
 user_service = UserService()
@@ -64,3 +65,16 @@ async def get_current_user(
         )
 
     return user
+
+
+class RoleChecker:
+    def __init__(self, allowed_roles: List[UserRole]):
+        self.allowed_roles = allowed_roles
+
+    def __call__(
+        self, current_user: Annotated[User, Depends(get_current_user)]
+    ) -> bool:
+        if current_user.role in self.allowed_roles:
+            return True
+
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Insufficient Permissions")

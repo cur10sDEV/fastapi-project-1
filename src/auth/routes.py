@@ -12,7 +12,11 @@ from src.db.redis import (
     delete_refresh_token_jti,
 )
 from src.utils.main import verify_password, create_jwt_token
-from .dependencies import RefreshTokenBearer, AccessTokenBearer, get_current_user
+from .dependencies import (
+    RefreshTokenBearer,
+    AccessTokenBearer,
+    get_current_user,
+)
 from .models import User
 from .schemas import UserCreateSchema, UserLoginSchema
 from .services import UserService
@@ -69,14 +73,16 @@ async def login_user(
     user_id = str(user.id)
     token_jti = str(uuid4())
 
-    access_token = create_jwt_token(user_id=user_id, jti=token_jti)
+    access_token = create_jwt_token(user_id=user_id, role=user.role, jti=token_jti)
 
     if access_token is None:
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, "Unable to register User"
         )
 
-    refresh_token = create_jwt_token(user_id=user_id, jti=token_jti, refresh=True)
+    refresh_token = create_jwt_token(
+        user_id=user_id, role=user.role, jti=token_jti, refresh=True
+    )
 
     if refresh_token is None:
         raise HTTPException(
@@ -99,6 +105,7 @@ async def login_user(
 async def generate_new_token_pair(auth: Annotated[dict, Depends(refresh_token_bearer)]):
     token_jti = auth["jti"]
     user_id = auth["sub"]
+    user_role = auth["role"]
 
     # validate the token, jti and its attributes
     is_jti_valid = await check_refresh_token_jti(token_jti, user_id)
@@ -118,13 +125,15 @@ async def generate_new_token_pair(auth: Annotated[dict, Depends(refresh_token_be
     new_token_jti = str(uuid4())
 
     # create new token pairs
-    access_token = create_jwt_token(user_id=user_id, jti=new_token_jti)
+    access_token = create_jwt_token(user_id=user_id, role=user_role, jti=new_token_jti)
     if access_token is None:
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create new access token"
         )
 
-    refresh_token = create_jwt_token(user_id=user_id, refresh=True, jti=new_token_jti)
+    refresh_token = create_jwt_token(
+        user_id=user_id, role=user_role, refresh=True, jti=new_token_jti
+    )
     if refresh_token is None:
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create new refresh token"
@@ -156,5 +165,7 @@ async def logout_user(auth: Annotated[dict, Depends(access_token_bearer)]):
 
 
 @auth_router.get("/me", response_model=User, status_code=status.HTTP_200_OK)
-async def get_current_user(user: Annotated[User, Depends(get_current_user)]):
+async def get_current_user(
+    user: Annotated[User, Depends(get_current_user)],
+):
     return user

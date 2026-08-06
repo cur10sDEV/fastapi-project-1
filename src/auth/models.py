@@ -1,10 +1,15 @@
 from datetime import datetime
+from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, DateTime
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Enum as SQLEnum, Column, DateTime
 
 from src.utils.main import utcnow
+
+
+class UserRole(StrEnum):
+    USER = "USER"
+    ADMIN = "ADMIN"
 
 
 class User(SQLModel, table=True):
@@ -13,6 +18,16 @@ class User(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
 
     username: str = Field(unique=True)
+
+    role: UserRole = Field(
+        sa_column=Column(
+            SQLEnum(
+                UserRole, name="userrole"
+            ),  # name must match what's in the migration
+            nullable=False,
+            server_default=UserRole.USER,
+        )
+    )
 
     email: str = Field(unique=True)
 
