@@ -1,10 +1,14 @@
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import Column, DateTime, Text
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel, Relationship
 
 from src.utils.main import utcnow
+
+if TYPE_CHECKING:
+    from src.auth.models import User  # noqa: F401
 
 
 class Book(SQLModel, table=True):
@@ -41,5 +45,5 @@ class Book(SQLModel, table=True):
         ),
     )
     #
-    # author: Author = Relationship(back_populates="books")
+    author: "User" = Relationship(back_populates="books")
     # publisher: Publisher = Relationship(back_populates="books")

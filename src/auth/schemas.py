@@ -10,6 +10,7 @@ from pydantic import (
     AfterValidator,
 )
 
+from src.books.schemas import BookSchema
 from src.utils.main import validate_password_strength, validate_username
 
 
@@ -22,6 +23,7 @@ class UserSchema(BaseModel):
     is_verified: bool
     created_at: datetime
     updated_at: datetime
+    books: list[BookSchema]
 
 
 class UserCreateSchema(BaseModel):

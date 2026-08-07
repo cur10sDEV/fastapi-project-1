@@ -18,7 +18,7 @@ from .dependencies import (
     get_current_user,
 )
 from .models import User
-from .schemas import UserCreateSchema, UserLoginSchema
+from .schemas import UserCreateSchema, UserLoginSchema, UserSchema
 from .services import UserService
 
 auth_router = APIRouter(tags=["users"])
@@ -164,7 +164,7 @@ async def logout_user(auth: Annotated[dict, Depends(access_token_bearer)]):
     return {}
 
 
-@auth_router.get("/me", response_model=User, status_code=status.HTTP_200_OK)
+@auth_router.get("/me", response_model=UserSchema, status_code=status.HTTP_200_OK)
 async def get_current_user(
     user: Annotated[User, Depends(get_current_user)],
 ):

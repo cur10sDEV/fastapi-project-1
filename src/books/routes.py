@@ -25,6 +25,20 @@ async def get_books(session: Annotated[AsyncSession, Depends(get_session)]):
 
 
 @book_router.get(
+    "/user", response_model=list[BookSchema], status_code=status.HTTP_200_OK
+)
+async def get_user_books(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    auth: Annotated[dict, Depends(access_token_bearer)],
+):
+    user_id = auth["sub"]
+
+    user_books = await book_service.get_user_books(user_id, session)
+
+    return user_books
+
+
+@book_router.get(
     "/{book_id}", response_model=BookSchema, status_code=status.HTTP_200_OK
 )
 async def get_book(

@@ -1,10 +1,14 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlmodel import SQLModel, Field, Enum as SQLEnum, Column, DateTime
+from sqlmodel import SQLModel, Field, Enum as SQLEnum, Column, DateTime, Relationship
 
 from src.utils.main import utcnow
+
+if TYPE_CHECKING:
+    from src.books.models import Book  # noqa: F401
 
 
 class UserRole(StrEnum):
@@ -47,4 +51,8 @@ class User(SQLModel, table=True):
         sa_column=Column(
             DateTime(timezone=True), nullable=False, onupdate=utcnow, default=utcnow
         ),
+    )
+
+    books: list["Book"] = Relationship(
+        back_populates="author", sa_relationship_kwargs={"lazy": "selectin"}
     )
