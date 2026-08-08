@@ -18,7 +18,7 @@ from .dependencies import (
     get_current_user,
 )
 from .models import User
-from .schemas import UserCreateSchema, UserLoginSchema, UserSchema
+from .schemas import UserCreateSchema, UserLoginSchema, UserSchema, UserDetailSchema
 from .services import UserService
 
 auth_router = APIRouter(tags=["users"])
@@ -27,7 +27,9 @@ refresh_token_bearer = RefreshTokenBearer()
 access_token_bearer = AccessTokenBearer()
 
 
-@auth_router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
+@auth_router.post(
+    "/register", response_model=UserSchema, status_code=status.HTTP_201_CREATED
+)
 async def register_user(
     user_data: Annotated[UserCreateSchema, Body()],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -161,10 +163,10 @@ async def logout_user(auth: Annotated[dict, Depends(access_token_bearer)]):
             "Cannot delete Refresh token from redis",
         )
 
-    return {}
+    return {"message": "Logged out successfully"}
 
 
-@auth_router.get("/me", response_model=UserSchema, status_code=status.HTTP_200_OK)
+@auth_router.get("/me", response_model=UserDetailSchema, status_code=status.HTTP_200_OK)
 async def get_current_user(
     user: Annotated[User, Depends(get_current_user)],
 ):

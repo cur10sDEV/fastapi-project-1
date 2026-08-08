@@ -1,5 +1,3 @@
-from uuid import UUID
-
 from sqlmodel import select, insert, update, delete, desc
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -29,7 +27,7 @@ class BookService:
 
         return result.all()
 
-    async def get_book_by_id(self, book_id: UUID, session: AsyncSession):
+    async def get_book_by_id(self, book_id: str, session: AsyncSession):
         statement = select(Book).where(Book.id == book_id)
 
         result = await session.exec(statement)
@@ -49,7 +47,7 @@ class BookService:
         return result.one_or_none()
 
     async def update_book(
-        self, book_id: UUID, book_data_dict: dict, session: AsyncSession
+        self, book_id: str, book_data_dict: dict, session: AsyncSession
     ):
         statement = (
             update(Book).where(Book.id == book_id).values(book_data_dict).returning("*")
@@ -61,7 +59,7 @@ class BookService:
 
         return result.one_or_none()
 
-    async def delete_book_by_id(self, book_id: UUID, session: AsyncSession):
+    async def delete_book_by_id(self, book_id: str, session: AsyncSession):
         statement = delete(Book).where(Book.id == book_id).returning("*")
 
         result = await session.exec(statement)

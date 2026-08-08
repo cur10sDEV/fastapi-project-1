@@ -1,5 +1,4 @@
 from typing import Annotated
-from uuid import UUID
 
 from fastapi import HTTPException, status, APIRouter, Body, Path, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -7,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.dependencies import AccessTokenBearer, RoleChecker
 from src.auth.models import UserRole
 from src.db.main import get_session
-from .schemas import BookSchema, BookCreateSchema, BookUpdateSchema
+from .schemas import BookSchema, BookCreateSchema, BookUpdateSchema, BookDetailSchema
 from .services import BookService
 
 user_role_checker = Depends(RoleChecker([UserRole.USER]))
@@ -39,10 +38,10 @@ async def get_user_books(
 
 
 @book_router.get(
-    "/{book_id}", response_model=BookSchema, status_code=status.HTTP_200_OK
+    "/{book_id}", response_model=BookDetailSchema, status_code=status.HTTP_200_OK
 )
 async def get_book(
-    book_id: Annotated[UUID, Path()],
+    book_id: Annotated[str, Path()],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
     book = await book_service.get_book_by_id(book_id, session)
@@ -78,7 +77,7 @@ async def add_book(
     "/{book_id}", response_model=BookSchema, status_code=status.HTTP_200_OK
 )
 async def update_book_by_id(
-    book_id: Annotated[UUID, Path()],
+    book_id: Annotated[str, Path()],
     book_data: Annotated[BookUpdateSchema, Body()],
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[dict, Depends(access_token_bearer)],
@@ -109,7 +108,7 @@ async def update_book_by_id(
     "/{book_id}", response_model=BookSchema, status_code=status.HTTP_200_OK
 )
 async def delete_book_by_id(
-    book_id: Annotated[UUID, Path()],
+    book_id: Annotated[str, Path()],
     session: Annotated[AsyncSession, Depends(get_session)],
     auth: Annotated[dict, Depends(access_token_bearer)],
 ):

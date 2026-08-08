@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import (
@@ -8,13 +8,19 @@ from pydantic import (
     EmailStr,
     model_validator,
     AfterValidator,
+    ConfigDict,
 )
 
-from src.books.schemas import BookSchema
 from src.utils.main import validate_password_strength, validate_username
+
+if TYPE_CHECKING:
+    from src.books.schemas import BookSchema  # noqa: F401
+    from src.reviews.schemas import ReviewSchema  # noqa: F401
 
 
 class UserSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     username: str
     email: str
@@ -23,19 +29,25 @@ class UserSchema(BaseModel):
     is_verified: bool
     created_at: datetime
     updated_at: datetime
-    books: list[BookSchema]
+
+
+class UserDetailSchema(UserSchema):
+    books: list["BookSchema"]
+    reviews: list["ReviewSchema"]
 
 
 class UserCreateSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     username: str = Annotated[
         Field(min_length=1, max_length=256), AfterValidator(validate_username)
     ]
-    email: EmailStr = Field(min_length=1, max_length=256)
-    first_name: str = Field(min_length=1, max_length=256, alias="first-name")
-    last_name: str = Field(min_length=1, max_length=256, alias="last-name")
-    password: str = Field(min_length=8, max_length=256)
+    email: EmailStr = Field(..., min_length=1, max_length=256)
+    first_name: str = Field(..., min_length=1, max_length=256, alias="first-name")
+    last_name: str = Field(..., min_length=1, max_length=256, alias="last-name")
+    password: str = Field(..., min_length=8, max_length=256)
     confirm_password: str = Field(
-        min_length=8, max_length=256, alias="confirm-password"
+        ..., min_length=8, max_length=256, alias="confirm-password"
     )
 
     @model_validator(mode="after")
@@ -47,7 +59,10 @@ class UserCreateSchema(BaseModel):
 
 
 class UserLoginSchema(BaseModel):
-    email: EmailStr = Field(min_length=1, max_length=256)
+    model_config = ConfigDict(from_attributes=True)
+
+    email: EmailStr = Field(..., min_length=1, max_length=256)
     password: str = Annotated[
-        Field(min_length=8, max_length=256), AfterValidator(validate_password_strength)
+        Field(..., min_length=8, max_length=256),
+        AfterValidator(validate_password_strength),
     ]

@@ -1,10 +1,14 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+
+from src.reviews.schemas import ReviewSchema
 
 
 class BookSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     title: str
     description: str | None
@@ -17,16 +21,22 @@ class BookSchema(BaseModel):
     updated_at: datetime
 
 
+class BookDetailSchema(BookSchema):
+    reviews: list[ReviewSchema] = []
+
+
 class BookCreateSchema(BaseModel):
-    title: str = Field(min_length=1, max_length=256)
+    model_config = ConfigDict(from_attributes=True)
+
+    title: str = Field(..., min_length=1, max_length=256)
     description: str | None = Field(
         default=None,
         max_length=1000,
     )
     publisher_id: str
     published_date: date
-    page_count: int = Field(gt=0)
-    language: str = Field(min_length=2, max_length=10)
+    page_count: int = Field(..., gt=0)
+    language: str = Field(..., min_length=2, max_length=10)
 
 
 class BookUpdateSchema(BookCreateSchema):

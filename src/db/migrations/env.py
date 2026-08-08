@@ -10,6 +10,7 @@ from sqlmodel import SQLModel
 from src.auth.models import User  # noqa: F401
 from src.books.models import Book  # noqa: F401
 from src.config import app_config
+from src.reviews.models import Review  # noqa: F401
 
 database_url = app_config.DATABASE_URL
 

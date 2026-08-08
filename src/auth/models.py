@@ -9,6 +9,7 @@ from src.utils.main import utcnow
 
 if TYPE_CHECKING:
     from src.books.models import Book  # noqa: F401
+    from src.reviews.models import Review  # noqa: F401
 
 
 class UserRole(StrEnum):
@@ -55,4 +56,8 @@ class User(SQLModel, table=True):
 
     books: list["Book"] = Relationship(
         back_populates="author", sa_relationship_kwargs={"lazy": "selectin"}
+    )
+
+    reviews: list["Review"] = Relationship(
+        back_populates="user", sa_relationship_kwargs={"lazy": "selectin"}
     )

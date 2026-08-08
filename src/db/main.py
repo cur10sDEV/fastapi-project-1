@@ -5,6 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.auth.models import User  # noqa: F401
 from src.books.models import Book  # noqa: F401
 from src.config import app_config
+from src.reviews.models import Review  # noqa: F401
 
 async_engine = create_async_engine(url=app_config.DATABASE_URL, echo=True)
 
