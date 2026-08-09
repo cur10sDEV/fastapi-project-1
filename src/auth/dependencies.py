@@ -1,10 +1,12 @@
 from typing import Any, Annotated, List
 
-from fastapi import HTTPException, status, Depends, Request
+from fastapi import Depends, Request
 from fastapi.security import HTTPBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.db.main import get_session
+from src.errors import AccessTokenRequired, RefreshTokenRequired, InsufficientPermission
+from src.errors import InvalidToken
 from src.utils.main import decode_token
 from .models import UserRole, User
 from .services import UserService
@@ -22,9 +24,7 @@ class AuthBearerToken(HTTPBearer):
         token_data = decode_token(token=creds.credentials)
 
         if token_data is None:
-            raise HTTPException(
-                status.HTTP_401_UNAUTHORIZED, "Invalid or Expired Token"
-            )
+            raise InvalidToken()
 
         self.verify_token_data(token_data)
 
@@ -37,17 +37,13 @@ class AuthBearerToken(HTTPBearer):
 class AccessTokenBearer(AuthBearerToken):
     def verify_token_data(self, token_data: dict):
         if token_data and token_data["refresh"]:
-            raise HTTPException(
-                status.HTTP_401_UNAUTHORIZED, "Please provide a valid Access Token"
-            )
+            raise AccessTokenRequired()
 
 
 class RefreshTokenBearer(AuthBearerToken):
     def verify_token_data(self, token_data: dict):
         if token_data and not token_data["refresh"]:
-            raise HTTPException(
-                status.HTTP_401_UNAUTHORIZED, "Please provide a valid Refresh Token"
-            )
+            raise RefreshTokenRequired()
 
 
 async def get_current_user(
@@ -57,12 +53,6 @@ async def get_current_user(
     user_id = auth["sub"]
 
     user = await user_service.get_user_by_id(user_id, session)
-
-    if user is None:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "User not found with this user_id associated to this token",
-        )
 
     return user
 
@@ -77,4 +67,4 @@ class RoleChecker:
         if current_user.role in self.allowed_roles:
             return True
 
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Insufficient Permissions")
+        raise InsufficientPermission()

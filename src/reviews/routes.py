@@ -1,12 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, status, Depends, Body, Path, HTTPException
+from fastapi import APIRouter, status, Depends, Body, Path
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.dependencies import RoleChecker, AccessTokenBearer, get_current_user
 from src.auth.models import UserRole, User
 from src.books.services import BookService
 from src.db.main import get_session
+from src.errors import BookNotFound, ReviewNotFound, InsufficientPermission
+from src.schemas import ResponseSchema
 from .schemas import ReviewSchema, ReviewCreateSchema, ReviewUpdateSchema
 from .services import ReviewService
 
@@ -22,7 +24,9 @@ review_service = ReviewService()
 
 
 @review_router.post(
-    "/books/{book_id}", response_model=ReviewSchema, status_code=status.HTTP_201_CREATED
+    "/books/{book_id}",
+    response_model=ResponseSchema[ReviewSchema],
+    status_code=status.HTTP_201_CREATED,
 )
 async def add_new_review(
     book_id: Annotated[str, Path()],
@@ -36,22 +40,23 @@ async def add_new_review(
     book_exists = await book_service.get_book_by_id(book_id, session)
 
     if book_exists is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Book not found!")
+        raise BookNotFound()
 
     review_data_dict["book_id"] = str(book_id)
 
     new_review = await review_service.create_new_review(review_data_dict, session)
 
-    if new_review is None:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to add review!"
-        )
-
-    return new_review
+    return ResponseSchema(
+        status_code=status.HTTP_201_CREATED,
+        message="Review added successfully",
+        data=new_review,
+    )
 
 
 @review_router.patch(
-    "/{review_id}", response_model=ReviewSchema, status_code=status.HTTP_200_OK
+    "/{review_id}",
+    response_model=ResponseSchema[ReviewSchema],
+    status_code=status.HTTP_200_OK,
 )
 async def update_review_by_id(
     review_id: Annotated[str, Path()],
@@ -65,20 +70,17 @@ async def update_review_by_id(
     existing_review = await review_service.get_review_by_id(review_id, session)
 
     if existing_review is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Review not found!")
+        raise ReviewNotFound()
 
     if not str(existing_review.user_id) == user_id:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN, "You can only update your own reviews"
-        )
+        raise InsufficientPermission()
 
     updated_review = await review_service.update_review_by_id(
         review_id, user_id, review_data_dict, session
     )
 
-    if updated_review is None:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Cannot update review"
-        )
-
-    return updated_review
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Review updated successfully",
+        data=updated_review,
+    )

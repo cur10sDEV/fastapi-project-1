@@ -1,8 +1,7 @@
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, status, HTTPException, Body
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, status, Body
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.db.main import get_session
@@ -11,6 +10,8 @@ from src.db.redis import (
     check_refresh_token_jti,
     delete_refresh_token_jti,
 )
+from src.errors import UserAlreadyExists, UserNotFound, InvalidCredentials, InvalidToken
+from src.schemas import ResponseSchema
 from src.utils.main import verify_password, create_jwt_token
 from .dependencies import (
     RefreshTokenBearer,
@@ -18,7 +19,7 @@ from .dependencies import (
     get_current_user,
 )
 from .models import User
-from .schemas import UserCreateSchema, UserLoginSchema, UserSchema, UserDetailSchema
+from .schemas import UserCreateSchema, UserLoginSchema, UserDetailSchema, UserSchema
 from .services import UserService
 
 auth_router = APIRouter(tags=["users"])
@@ -28,7 +29,9 @@ access_token_bearer = AccessTokenBearer()
 
 
 @auth_router.post(
-    "/register", response_model=UserSchema, status_code=status.HTTP_201_CREATED
+    "/register",
+    response_model=ResponseSchema[UserSchema],
+    status_code=status.HTTP_201_CREATED,
 )
 async def register_user(
     user_data: Annotated[UserCreateSchema, Body()],
@@ -39,22 +42,20 @@ async def register_user(
     )
 
     if existing_user:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT,
-            "User already exists - email or username already registered",
-        )
+        raise UserAlreadyExists()
 
     new_user = await user_service.create_user(user_data, session)
 
-    if new_user is None:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create User"
-        )
+    return ResponseSchema(
+        status_code=status.HTTP_201_CREATED,
+        message="User registration successful",
+        data=new_user,
+    )
 
-    return new_user
 
-
-@auth_router.post("/login", response_model=dict, status_code=status.HTTP_200_OK)
+@auth_router.post(
+    "/login", response_model=ResponseSchema[dict], status_code=status.HTTP_200_OK
+)
 async def login_user(
     user_data: Annotated[UserLoginSchema, Body()],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -65,45 +66,37 @@ async def login_user(
     user = await user_service.get_user_by_email(email, session)
 
     if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+        raise UserNotFound()
 
     valid_password = await verify_password(password, user.password)
 
     if valid_password is None or valid_password == False:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Wrong Password")
+        raise InvalidCredentials()
 
     user_id = str(user.id)
     token_jti = str(uuid4())
 
     access_token = create_jwt_token(user_id=user_id, role=user.role, jti=token_jti)
 
-    if access_token is None:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Unable to register User"
-        )
-
     refresh_token = create_jwt_token(
         user_id=user_id, role=user.role, jti=token_jti, refresh=True
     )
 
-    if refresh_token is None:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Unable to register User"
-        )
-
     # store refresh token in redis
-    jti_set = await set_refresh_token_jti(token_jti, user_id)
+    await set_refresh_token_jti(token_jti, user_id)
 
-    if not jti_set:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Unable to set refresh token into redis",
-        )
-
-    return JSONResponse({"access_token": access_token, "refresh_token": refresh_token})
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Login Successful",
+        data={"access_token": access_token, "refresh_token": refresh_token},
+    )
 
 
-@auth_router.post("/refresh-token", response_model=dict, status_code=status.HTTP_200_OK)
+@auth_router.post(
+    "/refresh-token",
+    response_model=ResponseSchema[dict],
+    status_code=status.HTTP_200_OK,
+)
 async def generate_new_token_pair(auth: Annotated[dict, Depends(refresh_token_bearer)]):
     token_jti = auth["jti"]
     user_id = auth["sub"]
@@ -112,15 +105,10 @@ async def generate_new_token_pair(auth: Annotated[dict, Depends(refresh_token_be
     # validate the token, jti and its attributes
     is_jti_valid = await check_refresh_token_jti(token_jti, user_id)
     if not is_jti_valid:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Refresh Token Malformed")
+        raise InvalidToken()
 
     # blacklist / delete the current jti
-    deleted = await delete_refresh_token_jti(token_jti)
-    if not deleted:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Cannot delete Refresh token from redis",
-        )
+    await delete_refresh_token_jti(token_jti)
 
     # check if user is valid or not
 
@@ -128,46 +116,44 @@ async def generate_new_token_pair(auth: Annotated[dict, Depends(refresh_token_be
 
     # create new token pairs
     access_token = create_jwt_token(user_id=user_id, role=user_role, jti=new_token_jti)
-    if access_token is None:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create new access token"
-        )
 
     refresh_token = create_jwt_token(
         user_id=user_id, role=user_role, refresh=True, jti=new_token_jti
     )
-    if refresh_token is None:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to create new refresh token"
-        )
 
     # store refresh token in redis
-    jti_set = await set_refresh_token_jti(new_token_jti, user_id)
-    if not jti_set:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Unable to set refresh token into redis",
-        )
+    await set_refresh_token_jti(new_token_jti, user_id)
 
-    return JSONResponse({"access_token": access_token, "refresh_token": refresh_token})
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="New token pair generated",
+        data={"access_token": access_token, "refresh_token": refresh_token},
+    )
 
 
-@auth_router.post("/logout", response_model=dict, status_code=status.HTTP_200_OK)
+@auth_router.post(
+    "/logout", response_model=ResponseSchema[None], status_code=status.HTTP_200_OK
+)
 async def logout_user(auth: Annotated[dict, Depends(access_token_bearer)]):
     token_jti = auth["jti"]
 
-    deleted = await delete_refresh_token_jti(token_jti)
-    if not deleted:
-        raise HTTPException(
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "Cannot delete Refresh token from redis",
-        )
+    await delete_refresh_token_jti(token_jti)
 
-    return {"message": "Logged out successfully"}
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK, message="Logged out successfully", data=None
+    )
 
 
-@auth_router.get("/me", response_model=UserDetailSchema, status_code=status.HTTP_200_OK)
+@auth_router.get(
+    "/me",
+    response_model=ResponseSchema[UserDetailSchema],
+    status_code=status.HTTP_200_OK,
+)
 async def get_current_user(
     user: Annotated[User, Depends(get_current_user)],
 ):
-    return user
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="User Details fetched successfully",
+        data=user,
+    )

@@ -1,11 +1,13 @@
 from typing import Annotated
 
-from fastapi import HTTPException, status, APIRouter, Body, Path, Depends
+from fastapi import status, APIRouter, Body, Path, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.auth.dependencies import AccessTokenBearer, RoleChecker
 from src.auth.models import UserRole
 from src.db.main import get_session
+from src.errors import InsufficientPermission, BookNotFound
+from src.schemas import ResponseSchema
 from .schemas import BookSchema, BookCreateSchema, BookUpdateSchema, BookDetailSchema
 from .services import BookService
 
@@ -16,15 +18,23 @@ book_service = BookService()
 access_token_bearer = AccessTokenBearer()
 
 
-@book_router.get("/", response_model=list[BookSchema], status_code=status.HTTP_200_OK)
+@book_router.get(
+    "/", response_model=ResponseSchema[list[BookSchema]], status_code=status.HTTP_200_OK
+)
 async def get_books(session: Annotated[AsyncSession, Depends(get_session)]):
     books = await book_service.get_all_books(session)
 
-    return books
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="List of books fetched successfully",
+        data=books,
+    )
 
 
 @book_router.get(
-    "/user", response_model=list[BookSchema], status_code=status.HTTP_200_OK
+    "/user",
+    response_model=ResponseSchema[list[BookSchema]],
+    status_code=status.HTTP_200_OK,
 )
 async def get_user_books(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -34,11 +44,17 @@ async def get_user_books(
 
     user_books = await book_service.get_user_books(user_id, session)
 
-    return user_books
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="User books fetched successfully",
+        data=user_books,
+    )
 
 
 @book_router.get(
-    "/{book_id}", response_model=BookDetailSchema, status_code=status.HTTP_200_OK
+    "/{book_id}",
+    response_model=ResponseSchema[BookDetailSchema],
+    status_code=status.HTTP_200_OK,
 )
 async def get_book(
     book_id: Annotated[str, Path()],
@@ -47,14 +63,18 @@ async def get_book(
     book = await book_service.get_book_by_id(book_id, session)
 
     if book is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Book not found"
-        )
+        raise BookNotFound()
 
-    return book
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Book details fetched successfully",
+        data=book,
+    )
 
 
-@book_router.post("/", response_model=BookSchema, status_code=status.HTTP_201_CREATED)
+@book_router.post(
+    "/", response_model=ResponseSchema[BookSchema], status_code=status.HTTP_201_CREATED
+)
 async def add_book(
     book_data: Annotated[BookCreateSchema, Body()],
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -65,16 +85,17 @@ async def add_book(
 
     book = await book_service.create_book(book_data_dict, session)
 
-    if book is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to add book"
-        )
-
-    return book
+    return ResponseSchema(
+        status_code=status.HTTP_201_CREATED,
+        message="New book added successfully",
+        data=book,
+    )
 
 
 @book_router.patch(
-    "/{book_id}", response_model=BookSchema, status_code=status.HTTP_200_OK
+    "/{book_id}",
+    response_model=ResponseSchema[BookSchema],
+    status_code=status.HTTP_200_OK,
 )
 async def update_book_by_id(
     book_id: Annotated[str, Path()],
@@ -87,25 +108,24 @@ async def update_book_by_id(
     book = await book_service.get_book_by_id(book_id, session)
 
     if book is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="book not found"
-        )
+        raise BookNotFound()
 
     if not str(book.author_id) == auth["sub"]:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not the author")
+        raise InsufficientPermission()
 
     updated_book = await book_service.update_book(book_id, book_data_dict, session)
 
-    if updated_book is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to update book"
-        )
-
-    return updated_book
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Book updated successfully",
+        data=updated_book,
+    )
 
 
 @book_router.delete(
-    "/{book_id}", response_model=BookSchema, status_code=status.HTTP_200_OK
+    "/{book_id}",
+    response_model=ResponseSchema[BookSchema],
+    status_code=status.HTTP_200_OK,
 )
 async def delete_book_by_id(
     book_id: Annotated[str, Path()],
@@ -115,18 +135,15 @@ async def delete_book_by_id(
     book = await book_service.get_book_by_id(book_id, session)
 
     if book is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="book not found"
-        )
+        raise BookNotFound()
 
     if not str(book.author_id) == auth["sub"]:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not the author")
+        raise InsufficientPermission()
 
     deleted_book = await book_service.delete_book_by_id(book_id, session)
 
-    if deleted_book is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Failed to delete book"
-        )
-
-    return deleted_book
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Book deleted successfully",
+        data=deleted_book,
+    )
