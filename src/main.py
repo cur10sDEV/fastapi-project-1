@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from src.auth.routes import auth_router
 from src.books.routes import book_router
 from src.errors import register_all_errors
+from src.middlewares import register_middlewares
 from src.reviews.routes import review_router
 
 
@@ -35,6 +36,8 @@ _rebuild_schemas()
 app = FastAPI(root_path="/api/v1", description="A test api")
 
 register_all_errors(app)
+
+register_middlewares(app)
 
 app.include_router(book_router, prefix="/books")
 app.include_router(auth_router, prefix="/auth")
