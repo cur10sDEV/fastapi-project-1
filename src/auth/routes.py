@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, status, Body
+from fastapi import APIRouter, Depends, status, Body, Path
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.db.main import get_session
@@ -11,8 +11,14 @@ from src.db.redis import (
     delete_refresh_token_jti,
 )
 from src.errors import UserAlreadyExists, UserNotFound, InvalidCredentials, InvalidToken
+from src.mail.main import send_user_verification_message
 from src.schemas import ResponseSchema
-from src.utils.main import verify_password, create_jwt_token
+from src.utils.main import (
+    verify_password,
+    create_jwt_token,
+    generate_verification_token,
+    validate_verification_token,
+)
 from .dependencies import (
     RefreshTokenBearer,
     AccessTokenBearer,
@@ -46,10 +52,48 @@ async def register_user(
 
     new_user = await user_service.create_user(user_data, session)
 
+    new_user_dict = UserSchema.model_validate(new_user).model_dump()
+
+    verification_token = generate_verification_token(
+        email=new_user_dict["email"], username=new_user_dict["username"]
+    )
+
+    await send_user_verification_message(
+        username=new_user_dict["username"],
+        email=new_user_dict["email"],
+        verification_token=verification_token,
+    )
+
     return ResponseSchema(
         status_code=status.HTTP_201_CREATED,
-        message="User registration successful",
+        message="User registration successful. Please check your mail for verification link.",
         data=new_user,
+    )
+
+
+@auth_router.get(
+    "/verify/{verification_token}",
+    response_model=ResponseSchema[UserSchema],
+    status_code=status.HTTP_200_OK,
+)
+async def verify_user(
+    verification_token: Annotated[str, Path()],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    decoded = validate_verification_token(verification_token)
+
+    if decoded is None:
+        raise InvalidToken()
+
+    user = await user_service.get_user_by_email(email=decoded["email"], session=session)
+
+    if user is None:
+        raise UserNotFound()
+
+    verified_user = await user_service.verify_user(str(user.id), session)
+
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK, message="Account Verified", data=verified_user
     )
 
 

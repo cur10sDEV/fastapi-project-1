@@ -1,5 +1,5 @@
 from pydantic import EmailStr
-from sqlmodel import select, insert
+from sqlmodel import select, insert, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.utils.main import hash_password
@@ -59,6 +59,20 @@ class UserService:
         del user_data_dict["confirm_password"]
 
         statement = insert(User).values(**user_data_dict).returning("*")
+
+        result = await session.exec(statement)
+
+        await session.commit()
+
+        return result.one_or_none()
+
+    async def verify_user(self, user_id: str, session: AsyncSession):
+        statement = (
+            update(User)
+            .where(User.id == user_id)
+            .values(is_verified=True)
+            .returning("*")
+        )
 
         result = await session.exec(statement)
 

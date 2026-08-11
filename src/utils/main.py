@@ -11,6 +11,7 @@ from argon2.exceptions import (
     VerificationError,
     InvalidHashError,
 )
+from itsdangerous import URLSafeSerializer
 
 from src.config import app_config
 
@@ -24,6 +25,7 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# ------ Password ------
 def validate_password_strength(value: str) -> str:
     value = str(value)
     if len(value) < 8:
@@ -39,7 +41,9 @@ def validate_password_strength(value: str) -> str:
 
 async def hash_password(input_password: str):
     try:
-        return await asyncio.to_thread(ph.hash, input_password)
+        return await asyncio.to_thread(
+            ph.hash, password=input_password, salt=bytes(app_config.JWT_SALT, "utf-8")
+        )
     except HashingError as e:
         logging.exception(e)
         return None
@@ -53,6 +57,7 @@ async def verify_password(input_password: str, hashed_password: str):
         return False
 
 
+# ------ JWT ------
 def create_jwt_token(user_id: str, role: str, jti: str, refresh: bool = False):
 
     now = utcnow()
@@ -104,6 +109,7 @@ def decode_token(token: str) -> dict | None:
         return None
 
 
+# ------ Custom Validators ------
 def validate_username(username: str) -> str:
     username = username.strip()
 
@@ -120,3 +126,25 @@ def validate_username(username: str) -> str:
         raise ValueError("Username cannot contain consecutive underscores")
 
     return username.lower()  # normalize to lowercase for consistent uniqueness checks
+
+
+# ------- Verification -------
+verifier = URLSafeSerializer(
+    secret_key=app_config.VERIFICATION_SECRET, salt=app_config.VERIFICATION_SALT
+)
+
+
+def generate_verification_token(email: str, username: str):
+    token = verifier.dumps({"email": email, "username": username})
+
+    return token
+
+
+def validate_verification_token(token: str) -> dict | None:
+    try:
+        result = verifier.loads(token)
+        return result
+
+    except Exception as e:
+        logging.exception(e)
+        return None
