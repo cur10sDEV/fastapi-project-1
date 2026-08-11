@@ -5,7 +5,7 @@ from pydantic import NameEmail
 
 from src.config import app_config
 from .schemas import MailSubjectTypes
-from .templates import USER_VERIFICATION_MAIL_TEMPLATE
+from .templates import USER_VERIFICATION_MAIL_TEMPLATE, RESET_PASSWORD_MAIL_TEMPLATE
 
 # BASE_DIR = Path(__file__).resolve().parent
 
@@ -39,6 +39,10 @@ def create_user_verification_url(token: str):
     return f"{app_config.DOMAIN}/api/v1/auth/verify/{token}"
 
 
+def create_reset_password_url(token: str):
+    return f"{app_config.DOMAIN}/api/v1/auth/reset-password/{token}"
+
+
 async def send_user_verification_message(
     username: str,
     email: NameEmail,
@@ -53,7 +57,7 @@ async def send_user_verification_message(
         .replace("{{app_name}}", app_config.NAME)
         .replace("{{app_url}}", app_config.DOMAIN)
         .replace(
-            "{{expiry_time}}", f"{app_config.VERIFICATION_MAIL_EXPIRY / 3600} hours"
+            "{{expiry_time}}", f"{app_config.URL_SAFE_TOKEN_MAIL_EXPIRY / 3600} hours"
         )
         .replace("{{year}}", f"{date.today().year}")
     )
@@ -62,6 +66,30 @@ async def send_user_verification_message(
         recipients=[email],
         subject=MailSubjectTypes.ACCOUNT_VERIFICATION,
         body=message_body,
+    )
+
+    await mail.send_message(message=message)
+
+
+async def send_password_reset_request_message(
+    username: str, email: NameEmail, reset_password_token: str
+):
+    message_body = (
+        RESET_PASSWORD_MAIL_TEMPLATE.replace("{{user_name}}", username)
+        .replace(
+            "{{reset_password_url}}",
+            create_reset_password_url(reset_password_token),
+        )
+        .replace("{{app_name}}", app_config.NAME)
+        .replace("{{app_url}}", app_config.DOMAIN)
+        .replace(
+            "{{expiry_time}}", f"{app_config.URL_SAFE_TOKEN_MAIL_EXPIRY / 3600} hours"
+        )
+        .replace("{{year}}", f"{date.today().year}")
+    )
+
+    message = create_message(
+        recipients=[email], subject=MailSubjectTypes.RESET_PASSWORD, body=message_body
     )
 
     await mail.send_message(message=message)

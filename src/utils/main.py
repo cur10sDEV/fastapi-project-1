@@ -130,17 +130,17 @@ def validate_username(username: str) -> str:
 
 # ------- Verification -------
 verifier = URLSafeSerializer(
-    secret_key=app_config.VERIFICATION_SECRET, salt=app_config.VERIFICATION_SALT
+    secret_key=app_config.URL_SAFE_TOKEN_SECRET, salt=app_config.URL_SAFE_TOKEN_SALT
 )
 
 
-def generate_verification_token(email: str, username: str):
-    token = verifier.dumps({"email": email, "username": username})
+def generate_url_safe_token(email: str):
+    token = verifier.dumps({"email": email})
 
     return token
 
 
-def validate_verification_token(token: str) -> dict | None:
+def validate_url_safe_token(token: str) -> dict | None:
     try:
         result = verifier.loads(token)
         return result

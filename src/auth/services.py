@@ -79,3 +79,19 @@ class UserService:
         await session.commit()
 
         return result.one_or_none()
+
+    async def update_password(
+        self, user_id: str, new_password_hash: str, session: AsyncSession
+    ):
+        statement = (
+            update(User)
+            .where(User.id == user_id)
+            .values(password=new_password_hash)
+            .returning("*")
+        )
+
+        result = await session.exec(statement)
+
+        await session.commit()
+
+        return result.one_or_none()

@@ -15,9 +15,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     JWT_ACCESS_TOKEN_EXPIRY_SECONDS: int
     JWT_REFRESH_TOKEN_EXPIRY_DAYS: int
-    VERIFICATION_SECRET: str
-    VERIFICATION_SALT: str
-    VERIFICATION_MAIL_EXPIRY: int = 3600  # seconds - 1 hour
+    URL_SAFE_TOKEN_SECRET: str
+    URL_SAFE_TOKEN_SALT: str
+    URL_SAFE_TOKEN_MAIL_EXPIRY: int = 3600  # seconds - 1 hour
     REDIS_HOST: str
     REDIS_PORT: str
     MAIL_USERNAME: str

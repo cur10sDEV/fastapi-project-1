@@ -9,15 +9,29 @@ from src.db.redis import (
     set_refresh_token_jti,
     check_refresh_token_jti,
     delete_refresh_token_jti,
+    set_url_safe_token,
+    get_url_safe_token,
+    delete_url_safe_token,
+    RedisKeysPrefixes,
 )
-from src.errors import UserAlreadyExists, UserNotFound, InvalidCredentials, InvalidToken
-from src.mail.main import send_user_verification_message
+from src.errors import (
+    UserAlreadyExists,
+    UserNotFound,
+    InvalidCredentials,
+    InvalidToken,
+    OldPasswordError,
+)
+from src.mail.main import (
+    send_user_verification_message,
+    send_password_reset_request_message,
+)
 from src.schemas import ResponseSchema
 from src.utils.main import (
     verify_password,
     create_jwt_token,
-    generate_verification_token,
-    validate_verification_token,
+    generate_url_safe_token,
+    validate_url_safe_token,
+    hash_password,
 )
 from .dependencies import (
     RefreshTokenBearer,
@@ -25,7 +39,14 @@ from .dependencies import (
     get_current_user,
 )
 from .models import User
-from .schemas import UserCreateSchema, UserLoginSchema, UserDetailSchema, UserSchema
+from .schemas import (
+    UserCreateSchema,
+    UserLoginSchema,
+    UserDetailSchema,
+    UserSchema,
+    ResetPasswordRequestSchema,
+    ResetPasswordConfirmSchema,
+)
 from .services import UserService
 
 auth_router = APIRouter(tags=["users"])
@@ -52,15 +73,19 @@ async def register_user(
 
     new_user = await user_service.create_user(user_data, session)
 
-    new_user_dict = UserSchema.model_validate(new_user).model_dump()
+    # new_user_dict = UserSchema.model_validate(new_user).model_dump()
 
-    verification_token = generate_verification_token(
-        email=new_user_dict["email"], username=new_user_dict["username"]
+    verification_token = generate_url_safe_token(email=new_user.email)
+
+    await set_url_safe_token(
+        prefix=RedisKeysPrefixes.USER_VERIFICATION_TOKEN,
+        token=verification_token,
+        user_email=new_user.email,
     )
 
     await send_user_verification_message(
-        username=new_user_dict["username"],
-        email=new_user_dict["email"],
+        username=new_user.username,
+        email=new_user.email,
         verification_token=verification_token,
     )
 
@@ -80,9 +105,16 @@ async def verify_user(
     verification_token: Annotated[str, Path()],
     session: Annotated[AsyncSession, Depends(get_session)],
 ):
-    decoded = validate_verification_token(verification_token)
+    decoded = validate_url_safe_token(verification_token)
 
     if decoded is None:
+        raise InvalidToken()
+
+    user_email = await get_url_safe_token(
+        prefix=RedisKeysPrefixes.USER_VERIFICATION_TOKEN, token=verification_token
+    )
+
+    if user_email is None:
         raise InvalidToken()
 
     user = await user_service.get_user_by_email(email=decoded["email"], session=session)
@@ -91,6 +123,10 @@ async def verify_user(
         raise UserNotFound()
 
     verified_user = await user_service.verify_user(str(user.id), session)
+
+    await delete_url_safe_token(
+        prefix=RedisKeysPrefixes.USER_VERIFICATION_TOKEN, token=verification_token
+    )
 
     return ResponseSchema(
         status_code=status.HTTP_200_OK, message="Account Verified", data=verified_user
@@ -200,4 +236,93 @@ async def get_current_user(
         status_code=status.HTTP_200_OK,
         message="User Details fetched successfully",
         data=user,
+    )
+
+
+@auth_router.post(
+    "/reset-password",
+    response_model=ResponseSchema[None],
+    status_code=status.HTTP_200_OK,
+)
+async def reset_password_request(
+    reset_password_request_data: Annotated[ResetPasswordRequestSchema, Body()],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    reset_password_request_data_dict = reset_password_request_data.model_dump()
+    user_email = reset_password_request_data_dict["email"]
+
+    user = await user_service.get_user_by_email(user_email, session)
+
+    if user is None:
+        raise UserNotFound()
+
+    reset_password_token = generate_url_safe_token(email=user_email)
+
+    await set_url_safe_token(
+        prefix=RedisKeysPrefixes.PASSWORD_RESET_TOKEN,
+        token=reset_password_token,
+        user_email=user.email,
+    )
+
+    await send_password_reset_request_message(
+        username=user.username,
+        email=user.email,
+        reset_password_token=reset_password_token,
+    )
+
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK,
+        message="Reset Password link has been sent to your email. Please check your inbox.",
+        data=None,
+    )
+
+
+@auth_router.post(
+    "/reset-password/{reset_password_token}",
+    response_model=ResponseSchema[None],
+    status_code=status.HTTP_200_OK,
+)
+async def reset_password_confirm(
+    reset_password_token: Annotated[str, Path()],
+    reset_password_data: Annotated[ResetPasswordConfirmSchema, Body()],
+    session: Annotated[AsyncSession, Depends(get_session)],
+):
+    reset_password_data_dict = reset_password_data.model_dump()
+
+    decoded_token = validate_url_safe_token(reset_password_token)
+
+    if decoded_token is None:
+        raise InvalidToken()
+
+    user_email = await get_url_safe_token(
+        prefix=RedisKeysPrefixes.PASSWORD_RESET_TOKEN, token=reset_password_token
+    )
+
+    if (
+        user_email is None
+        or decoded_token["email"] is None
+        or not user_email == decoded_token["email"]
+    ):
+        raise InvalidToken()
+
+    user = await user_service.get_user_by_email(user_email, session)
+
+    if user is None:
+        raise UserNotFound()
+
+    new_password_hash = await hash_password(reset_password_data_dict["new_password"])
+
+    if user.password == new_password_hash:
+        raise OldPasswordError()
+
+    await user_service.update_password(
+        user_id=str(user.id), new_password_hash=new_password_hash, session=session
+    )
+
+    await delete_url_safe_token(
+        prefix=RedisKeysPrefixes.PASSWORD_RESET_TOKEN, token=reset_password_token
+    )
+
+    return ResponseSchema(
+        status_code=status.HTTP_200_OK, message="Password reset successful", data=None
     )

@@ -66,3 +66,21 @@ class UserLoginSchema(BaseModel):
         Field(..., min_length=8, max_length=256),
         AfterValidator(validate_password_strength),
     ]
+
+
+class ResetPasswordRequestSchema(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordConfirmSchema(BaseModel):
+    new_password: str = Field(..., min_length=8, max_length=256, alias="new-password")
+    confirm_new_password: str = Field(
+        ..., min_length=8, max_length=256, alias="confirm-new-password"
+    )
+
+    @model_validator(mode="after")
+    def validate_password(self):
+        validate_password_strength(self.new_password)
+        if self.new_password != self.confirm_new_password:
+            raise ValueError("Passwords do not match")
+        return self

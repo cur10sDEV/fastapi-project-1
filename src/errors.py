@@ -96,8 +96,8 @@ class UserNotFound(CustomException):
     pass
 
 
-class AccountNotVerified(CustomException):
-    """Account not yet verified"""
+class OldPasswordError(CustomException):
+    """Resetting to an old password"""
 
     pass
 
@@ -232,17 +232,6 @@ def register_all_errors(app: FastAPI):
     )
 
     app.add_exception_handler(
-        AccountNotVerified,
-        create_exception_handler(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            initial_detail=CustomExceptionInitialDetailSchema(
-                message="Account not verified",
-                error_code="account_verification_failed",
-            ),
-        ),
-    )
-
-    app.add_exception_handler(
         TagNotFound,
         create_exception_handler(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -278,6 +267,17 @@ def register_all_errors(app: FastAPI):
             status_code=status.HTTP_403_FORBIDDEN,
             initial_detail=CustomExceptionInitialDetailSchema(
                 message="Account Not verified", error_code="account_not_verified"
+            ),
+        ),
+    )
+
+    app.add_exception_handler(
+        OldPasswordError,
+        create_exception_handler(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            initial_detail=CustomExceptionInitialDetailSchema(
+                message="Cannot set old password as new. Please set a new password",
+                error_code="reset_to_old_password",
             ),
         ),
     )
