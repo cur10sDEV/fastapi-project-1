@@ -11,9 +11,9 @@ from src.schemas import ResponseSchema
 from .schemas import BookSchema, BookCreateSchema, BookUpdateSchema, BookDetailSchema
 from .services import BookService
 
-user_role_checker = Depends(RoleChecker([UserRole.USER]))
+role_checker = Depends(RoleChecker([UserRole.USER, UserRole.ADMIN]))
 
-book_router = APIRouter(tags=["Books"], dependencies=[user_role_checker])
+book_router = APIRouter(tags=["Books"], dependencies=[role_checker])
 book_service = BookService()
 access_token_bearer = AccessTokenBearer()
 

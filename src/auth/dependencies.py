@@ -5,7 +5,12 @@ from fastapi.security import HTTPBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.db.main import get_session
-from src.errors import AccessTokenRequired, RefreshTokenRequired, InsufficientPermission
+from src.errors import (
+    AccessTokenRequired,
+    RefreshTokenRequired,
+    InsufficientPermission,
+    AccountNotVerified,
+)
 from src.errors import InvalidToken
 from src.utils.main import decode_token
 from .models import UserRole, User
@@ -64,6 +69,9 @@ class RoleChecker:
     def __call__(
         self, current_user: Annotated[User, Depends(get_current_user)]
     ) -> bool:
+        if not current_user.is_verified:
+            raise AccountNotVerified()
+
         if current_user.role in self.allowed_roles:
             return True
 

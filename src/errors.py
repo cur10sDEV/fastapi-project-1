@@ -60,6 +60,12 @@ class InsufficientPermission(CustomException):
     pass
 
 
+class AccountNotVerified(CustomException):
+    """User has not verified their account after registration."""
+
+    pass
+
+
 class BookNotFound(CustomException):
     """Book Not found"""
 
@@ -221,6 +227,17 @@ def register_all_errors(app: FastAPI):
             initial_detail=CustomExceptionInitialDetailSchema(
                 message="You do not have enough permissions to perform this action",
                 error_code="insufficient_permissions",
+            ),
+        ),
+    )
+
+    app.add_exception_handler(
+        AccountNotVerified,
+        create_exception_handler(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            initial_detail=CustomExceptionInitialDetailSchema(
+                message="Account not verified",
+                error_code="account_verification_failed",
             ),
         ),
     )
