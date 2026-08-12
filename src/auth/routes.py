@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, status, Body, Path
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.celery_tasks import send_mail
 from src.db.main import get_session
 from src.db.redis import (
     set_refresh_token_jti,
@@ -21,10 +22,7 @@ from src.errors import (
     InvalidToken,
     OldPasswordError,
 )
-from src.mail.main import (
-    send_user_verification_message,
-    send_password_reset_request_message,
-)
+from src.mail.schemas import MailSubjectTypes
 from src.schemas import ResponseSchema
 from src.utils.main import (
     verify_password,
@@ -73,8 +71,6 @@ async def register_user(
 
     new_user = await user_service.create_user(user_data, session)
 
-    # new_user_dict = UserSchema.model_validate(new_user).model_dump()
-
     verification_token = generate_url_safe_token(email=new_user.email)
 
     await set_url_safe_token(
@@ -83,10 +79,11 @@ async def register_user(
         user_email=new_user.email,
     )
 
-    await send_user_verification_message(
-        username=new_user.username,
-        email=new_user.email,
-        verification_token=verification_token,
+    send_mail.delay(
+        MailSubjectTypes.ACCOUNT_VERIFICATION,
+        new_user.username,
+        new_user.email,
+        verification_token,
     )
 
     return ResponseSchema(
@@ -264,10 +261,11 @@ async def reset_password_request(
         user_email=user.email,
     )
 
-    await send_password_reset_request_message(
-        username=user.username,
-        email=user.email,
-        reset_password_token=reset_password_token,
+    send_mail.delay(
+        MailSubjectTypes.RESET_PASSWORD_REQUEST,
+        user.username,
+        user.email,
+        reset_password_token,
     )
 
     return ResponseSchema(

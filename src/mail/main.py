@@ -89,7 +89,9 @@ async def send_password_reset_request_message(
     )
 
     message = create_message(
-        recipients=[email], subject=MailSubjectTypes.RESET_PASSWORD, body=message_body
+        recipients=[email],
+        subject=MailSubjectTypes.RESET_PASSWORD_REQUEST,
+        body=message_body,
     )
 
     await mail.send_message(message=message)

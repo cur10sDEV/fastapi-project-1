@@ -35,3 +35,8 @@ class Settings(BaseSettings):
 
 
 app_config = Settings()
+
+# will be read by celery
+broker_url = f"redis://{app_config.REDIS_HOST}:{app_config.REDIS_PORT}/0"
+result_backend = f"redis://{app_config.REDIS_HOST}:{app_config.REDIS_PORT}/0"
+broker_connection_retry_on_startup = True
