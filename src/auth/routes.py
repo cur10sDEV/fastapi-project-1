@@ -47,7 +47,7 @@ from .schemas import (
 )
 from .services import UserService
 
-auth_router = APIRouter(tags=["users"])
+auth_router = APIRouter(tags=["Users"])
 user_service = UserService()
 refresh_token_bearer = RefreshTokenBearer()
 access_token_bearer = AccessTokenBearer()

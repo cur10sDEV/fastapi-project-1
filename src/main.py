@@ -33,7 +33,11 @@ _rebuild_schemas()
 #     yield
 
 
-app = FastAPI(root_path="/api/v1", description="A test api")
+app = FastAPI(
+    title="Bookly",
+    root_path="/api/v1",
+    description="A test api",
+)
 
 register_all_errors(app)
 
